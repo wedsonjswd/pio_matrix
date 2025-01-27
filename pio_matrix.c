@@ -53,13 +53,11 @@ static void gpio_irq_handler(uint gpio, uint32_t events)
     reset_usb_boot(0,0); //habilita o modo de gravação do microcontrolador
 }
 
-//rotina para definição da intensidade de cores do led
-uint32_t matrix_rgb(double b, double r, double g)
-{
-    unsigned char R, G, B;
-    R = r * 255;
-    G = g * 255;
-    B = b * 255;
+// Função para calcular o valor RGB de uma cor
+uint32_t set_led_color(double r, double g, double b) {
+    unsigned char R = r * 255;
+    unsigned char G = g * 255;
+    unsigned char B = b * 255;
     return (G << 24) | (R << 16) | (B << 8);
 }
 
@@ -68,13 +66,28 @@ void desenho_pio(double *desenho, uint32_t valor_led, PIO pio, uint sm, double r
 {
     for (int16_t i = 0; i < NUM_PIXELS; i++) 
     {
-        valor_led = matrix_rgb(desenho[24 - i], 0.0, 0.0); // Azul apenas
+        valor_led = set_led_color(desenho[24 - i], 0.0, 0.0); // Azul apenas
         pio_sm_put_blocking(pio, sm, valor_led);
     }
     
     imprimir_binario(valor_led);
 }
 
+// Função para definir a cor de um LED específico na matriz
+void set_led_at_position(uint x, uint y, double r, double g, double b, double *desenho) 
+{
+    if (x >= 5 || y >= 5) return; // Verifica limites da matriz 5x5
+    desenho[y * 5 + x] = fmax(r, fmax(g, b)); // Define intensidade máxima da cor no vetor de desenho
+}
+
+// Função para acionar a matriz de LEDs
+void controlar_leds(double *desenho, PIO pio, uint sm) {
+    for (int16_t i = 0; i < NUM_PIXELS; i++) {
+        double intensidade = desenho[24 - i];
+        uint32_t valor_led = set_led_color(intensidade, 0.0, 0.0); // Exemplo: Vermelho com intensidade variável
+        pio_sm_put_blocking(pio, sm, valor_led);
+    }
+}
 
 //função principal
 int main()
@@ -114,19 +127,23 @@ int main()
 
     while (true) 
     {
+    
         if(gpio_get(button_1)) //botão em nível alto
         {
             //rotina para escrever na matriz de leds com o emprego de PIO - desenho 2
             desenho_pio(desenho, valor_led, pio, sm, r, g, b);
-            printf("\nfrequeência de clock %ld\r\n", clock_get_hz(clk_sys));
+             set_led_at_position(1, 1, 0.0, 1.0, 0.0, desenho);
+             controlar_leds(desenho, pio, sm);
         }
         else
         {
             //rotina para escrever na matriz de leds com o emprego de PIO - desenho 1
             desenho_pio(desenho2, valor_led, pio, sm, r, g, b);
-            printf("\nfrequeência de clock %ld\r\n", clock_get_hz(clk_sys));
+             set_led_at_position(1, 1, .0, 0.0, 1.0, desenho);
+             controlar_leds(desenho, pio, sm);
         }
-    
+        
+       
         sleep_ms(1000);
         printf("\nfrequeência de clock %ld\r\n", clock_get_hz(clk_sys));
     }
